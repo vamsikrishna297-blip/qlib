@@ -236,6 +236,8 @@ Load and prepare data by running the following code:
 
   ```
 
+  > **Troubleshooting**: `python -m qlib.run.download_data ...` is not a valid command in current Qlib releases and raises `ModuleNotFoundError: No module named 'qlib.run'`. Use `python -m qlib.cli.data ...` (or `python scripts/get_data.py ...` from source) instead.
+
 ### Get from source
 
   ```bash
@@ -246,6 +248,26 @@ Load and prepare data by running the following code:
   python scripts/get_data.py qlib_data --target_dir ~/.qlib/qlib_data/cn_data_1min --region cn --interval 1min
 
   ```
+
+### Build India (NSE) data from Yahoo
+
+Qlib's collector for non-packaged markets (including India) uses `yahooquery` to fetch Yahoo Finance data, then converts it into Qlib format.
+
+```bash
+# 1) Download raw India (NSE) daily data
+python scripts/data_collector/yahoo/collector.py download_data --source_dir ~/.qlib/stock_data/source/in_data --region IN --start 2020-01-01 --end 2020-12-31 --interval 1d
+
+# 2) Normalize Yahoo CSV files
+python scripts/data_collector/yahoo/collector.py normalize_data --source_dir ~/.qlib/stock_data/source/in_data --normalize_dir ~/.qlib/stock_data/source/in_1d_nor --region IN --interval 1d
+
+# 3) Dump normalized CSV files into Qlib binary format
+python scripts/dump_bin.py dump_all --data_path ~/.qlib/stock_data/source/in_1d_nor --qlib_dir ~/.qlib/qlib_data/in_data --freq day
+
+# 4) Initialize qlib with your India dataset
+python -c "import qlib; qlib.init(provider_uri='~/.qlib/qlib_data/in_data', region='us')"
+```
+
+> **Note**: The built-in prepackaged `qlib_data` downloader mainly targets CN/US bundles. For India, use the Yahoo collector workflow above.
 
 This dataset is created by public data collected by [crawler scripts](scripts/data_collector/), which have been released in
 the same repository.
