@@ -9,6 +9,7 @@ import bisect
 import pickle
 import requests
 import functools
+from io import StringIO
 from pathlib import Path
 from typing import Iterable, Tuple, List
 
@@ -367,10 +368,36 @@ def get_in_stock_symbols(qlib_data_path: [str, Path] = None) -> list:
 
     @deco_retry
     def _get_nifty():
-        url = f"https://www1.nseindia.com/content/equities/EQUITY_L.csv"
-        df = pd.read_csv(url)
+        urls = [
+            "https://nsearchives.nseindia.com/content/equities/EQUITY_L.csv",
+            "https://www1.nseindia.com/content/equities/EQUITY_L.csv",
+        ]
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            ),
+            "Accept": "text/csv,application/octet-stream,*/*",
+            "Referer": "https://www.nseindia.com/",
+        }
+        last_exception = None
+        for url in urls:
+            try:
+                resp = requests.get(url, headers=headers, timeout=30)
+                resp.raise_for_status()
+                df = pd.read_csv(StringIO(resp.text))
+                break
+            except Exception as exc:
+                last_exception = exc
+                logger.warning(f"failed to fetch NSE symbols from {url}: {exc}")
+        else:
+            raise ValueError(
+                "failed to fetch NSE symbols from all endpoints, "
+                "please check your network/proxy settings"
+            ) from last_exception
+
         df = df.rename(columns={"SYMBOL": "Symbol"})
-        df["Symbol"] = df["Symbol"] + ".NS"
+        df["Symbol"] = df["Symbol"].astype(str).str.strip() + ".NS"
         _symbols = df["Symbol"].dropna()
         _symbols = _symbols.unique().tolist()
         return _symbols
